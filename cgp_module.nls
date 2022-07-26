@@ -1,0 +1,162 @@
+globals [verbose?]
+
+breed [chromosomes a-chromosome]
+
+chromosomes-own [
+  num-inputs
+  num-cols
+  num-rows
+  num-outputs
+  num-funcs
+  max-arity
+  levels-back
+  num-mutations
+  genome
+  my-fitness
+  chrom-type
+]
+
+to-report init-chromosome [n-inputs n-cols n-rows n-outputs n-funcs arity lvlsbck n-muts c-type]
+  let return-chrom 0
+  hatch-chromosomes 1 [
+    set num-inputs n-inputs
+    set num-cols n-cols
+    set num-rows n-rows
+    set num-outputs n-outputs
+    set num-funcs n-funcs
+    set max-arity arity
+    set levels-back lvlsbck
+    set num-mutations n-muts
+    set genome generate-rand-chromosome
+    set chrom-type c-type
+    set my-fitness 0
+    set hidden? true
+    set return-chrom self
+  ]
+  report return-chrom
+end
+
+to-report generate-rand-chromosome
+  let chromosome []
+  let node-num num-inputs
+  foreach range num-cols [ col ->
+    foreach range num-rows [ row ->
+      set chromosome lput (generate-rand-node col node-num) chromosome
+      set node-num node-num + 1
+    ]
+  ]
+  foreach range num-outputs [ out ->
+    set chromosome lput (generate-rand-node num-cols node-num) chromosome
+    set node-num node-num + 1
+  ]
+  ;print chromosome
+  report activate-nodes chromosome
+end
+
+to-report generate-rand-node [column n]
+  let node []
+  set node lput (random num-funcs) node
+  set node lput (map [-> get-valid-connections column] range max-arity) node
+  set node lput false node
+  set node lput "none" node
+  set node lput n node
+  report node
+end
+
+to-report get-valid-connections [column]
+  let lower ifelse-value (column >= levels-back) [num-inputs + (column - levels-back) * num-rows] [0]
+  let upper num-inputs + column * num-rows
+  report ifelse-value (random-float 1 < 0.9) [lower + random (upper - lower)][random num-inputs]
+end
+
+to-report activate-nodes [chrom]
+  let to-activate (range (length chrom - num-outputs) length chrom)
+  foreach to-activate [ i ->
+    set chrom replace-item i chrom (replace-item 2 (item i chrom) true)
+  ]
+  set chrom recursion-activate-nodes chrom (length chrom)
+  report chrom
+end
+
+to-report recursion-activate-nodes [chrom node-num]
+  foreach reverse (sublist chrom 0 node-num) [ node ->
+    if item 2 node = true [
+      foreach range max-arity [ i ->
+        let id item i item 1 node
+        if id >= num-inputs [
+          let connection item (id - num-inputs) chrom
+          if last connection >= num-inputs [
+            set chrom replace-item (id - num-inputs) chrom (replace-item 2 (item (id - num-inputs) chrom) true)
+          ]
+        ]
+      ]
+    ]
+  ]
+  ifelse node-num > 0 [
+    set chrom recursion-activate-nodes chrom (node-num - 1)
+    report chrom
+  ] [
+    report chrom
+  ]
+end
+
+to-report evaluate [chrom input]
+  foreach chrom [ node ->
+    if item 2 node = true [
+      let inputs []
+      let id last node
+      foreach range max-arity [ i ->
+        let i-input item i item 1 node
+        ifelse i-input < num-inputs [
+          set inputs lput (item i-input input) inputs
+        ] [
+          set inputs lput (item 3 item (i-input - num-inputs) chrom) inputs
+        ]
+      ]
+      set chrom replace-item (id - num-inputs) chrom (replace-item 3 (item (id - num-inputs) chrom) func-eval (item 0 node) inputs)
+    ]
+  ]
+  let outputs []
+  foreach (range (length chrom - num-outputs) length chrom) [out-node ->
+    if item 2 item out-node chrom = true [
+      set outputs lput (item 3 item out-node chrom) outputs
+    ]
+  ]
+  report outputs
+end
+
+to-report mutate-a-chromosome [chrom]
+  repeat num-mutations [
+    set chrom mutate-a-gene chrom
+  ]
+  foreach range length chrom [ i ->
+    set chrom replace-item i chrom (replace-item 2 (item i chrom) false)
+  ]
+  set chrom activate-nodes chrom
+  report chrom
+end
+
+to-report mutate-a-gene [chrom]
+  let new-chrom chrom
+  let node random length chrom
+  ifelse random-float 1 < 0.5 [
+    set new-chrom replace-item node new-chrom (replace-item 0 (item node new-chrom) (random num-funcs))
+  ] [
+    let col floor (node / num-rows)
+    set new-chrom replace-item node new-chrom (replace-item 1 (item node new-chrom) (map [-> get-valid-connections col] range max-arity))
+  ]
+  report new-chrom
+end
+
+to-report func-eval [fid vals]
+  let z0 item 0 vals
+  let z1 item 1 vals
+  if fid = 0 [report ifelse-value (z0 < 0) [0][1]]
+  if fid = 1 [report (z0 + z1) / 2]
+  if fid = 2 [report (z0 - z1) / 2]
+  if fid = 3 [report z0 * z1]
+  if fid = 4 [report ifelse-value (z0 < 0 and z1 < 0) [-1][1]]
+  if fid = 5 [report ifelse-value (z0 < 0) [1][0]]
+  report 0
+end
+
