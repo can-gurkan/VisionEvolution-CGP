@@ -1,6 +1,4 @@
-extensions [rnd]
-
-__includes ["cgp_module.nls"]
+extensions [rnd cgp]
 
 globals [
   food-counts
@@ -55,7 +53,7 @@ to setup
     set color scale-color red land-mobility 4 -2.5
     ;set sim-n 3
     ;set sim-l 3
-    set brain init-brain
+    cgp:random-brain 6 3 4 5 4
   ]
 
   ask fish [ produce-fov ] ;; For visualization
@@ -66,20 +64,6 @@ to setup
 
   update-stats
   reset-ticks
-end
-
-to-report init-brain
-  let n-inputs 6
-  let n-cols 5
-  let n-rows 4
-  let n-outputs 3
-  let n-funcs 5
-  let arity 2
-  let lvlsbck 2
-  let n-muts 1
-  let c-type 0
-
-  report (init-chromosome n-inputs n-cols n-rows n-outputs n-funcs arity lvlsbck n-muts c-type)
 end
 
 to produce-fov
@@ -163,8 +147,7 @@ to consume-energy
   ;; Having large eyes also consumes energy
   set energy energy - ((eye-size ^ 3) * eye-cost)
   ; change cognition cost make it related to sim-n * sim-l
-  let num-nodes ((num-active-nodes [genome] of brain) / (5 * 4)) * 10
-  set energy (energy -  (num-nodes * cognition-cost / 100))
+  set energy (energy -  (0 * cognition-cost / 100))
   ;print num-active-nodes [genome] of brain
 end
 
@@ -177,23 +160,16 @@ to move-smart
   let radius rad-size eye-size
   let prey min-one-of (food with [(distance myself) < radius])[distance myself]
 
-  let results  []
-  ask brain [set results evaluate genome observations radius]
-
-  let d decision results
+  let d decision cgp:evaluate observations radius
   ;show results
   ;show prey
 
-  ifelse empty? results [
-    move-random
+  ifelse prey != nobody and distance prey < step-size [
+    move-to prey
   ] [
-    ifelse prey != nobody and distance prey < step-size [
-      move-to prey
-    ] [
-      if d = 0 [rt 20]
-      if d = 2 [lt 20]
-      fd step-size
-    ]
+    if d = 0 [rt 20]
+    if d = 2 [lt 20]
+    fd step-size
   ]
 
    ;; Changes the size of the field of vision if it steps on land
@@ -279,10 +255,7 @@ to reproduce
       ;set sim-l mutate-sim sim-l mutation-rate 0
       ;set sim-n mutate-sim sim-n mutation-rate 0
       set color scale-color red land-mobility 4 -2.5
-      let b 0
-      ask [brain] of myself [hatch-chromosomes 1 [set b self]]
-      set brain b
-      ask brain [set genome mutate-a-chromosome genome]
+      cgp:brain-from-parent myself 0.02
       produce-fov ;; for visualization
       ]
     move-random
@@ -310,7 +283,7 @@ to death
   ;; If out of energy, die
   if energy < 0 [
     ask out-link-neighbors [ die ]
-    ask brain [die]
+    cgp:clear-brain
     die
   ]
 end
@@ -367,7 +340,7 @@ end
 
 to-report avg-cog [ agentset ]
   let val ifelse-value (any? agentset)
-    [ mean [ num-active-nodes [genome] of brain ] of agentset ]
+    [ mean [ 1 ] of agentset ]
     [ 1 ]
   report val
 end

@@ -148,6 +148,10 @@ to-report mutate-a-gene [chrom]
   report new-chrom
 end
 
+to-report num-active-nodes [chrom]
+  report length filter [i -> item 2 i = True] chrom
+end
+
 to-report func-eval [fid vals]
   let z0 item 0 vals
   let z1 item 1 vals
