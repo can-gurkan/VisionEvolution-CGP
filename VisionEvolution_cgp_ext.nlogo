@@ -147,7 +147,7 @@ to consume-energy
   ;; Having large eyes also consumes energy
   set energy energy - ((eye-size ^ 3) * eye-cost)
   ; change cognition cost make it related to sim-n * sim-l
-  set energy (energy -  (0 * cognition-cost / 100))
+  set energy (energy -  ((cgp:active-nodes / 10) * cognition-cost / 100))
   ;print num-active-nodes [genome] of brain
 end
 
@@ -340,7 +340,7 @@ end
 
 to-report avg-cog [ agentset ]
   let val ifelse-value (any? agentset)
-    [ mean [ 1 ] of agentset ]
+    [ mean [ cgp:active-nodes ] of agentset ]
     [ 1 ]
   report val
 end
